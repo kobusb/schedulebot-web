@@ -175,6 +175,12 @@ CREATE TABLE meeting_types (
     max_per_day         SMALLINT,  -- NULL = unlimited
     is_active           BOOLEAN NOT NULL DEFAULT true,
     schedule_id         UUID REFERENCES availability_schedules(id),  -- NULL = use default
+    confirmation_enabled BOOLEAN NOT NULL DEFAULT true,
+    reminder_enabled    BOOLEAN NOT NULL DEFAULT true,
+    reminder_hours_before SMALLINT NOT NULL DEFAULT 24,
+    allow_cancellation  BOOLEAN NOT NULL DEFAULT true,
+    allow_reschedule    BOOLEAN NOT NULL DEFAULT true,
+    cancellation_notice_hours SMALLINT NOT NULL DEFAULT 0,  -- 0 = anytime before meeting
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE(user_id, slug)
@@ -564,17 +570,21 @@ Since scheduling entities don't exist in sb_api yet, development must be coordin
 #### Workstream 1: Project Setup (Sprint 0)
 - Next.js App Router project scaffolding
 - Tailwind CSS v4 + shadcn/ui setup
-- Brand design tokens (colors, typography, spacing)
+- Brand design tokens (colors, typography selection [Inter or similar], spacing)
+- Logo placeholder, favicon, OG image template for booking page social previews
 - BFF pattern setup (API route structure, sb_api client)
 - Auth flow (OAuth via sb_api, session cookies)
 - CI/CD pipeline (lint, typecheck, test, deploy)
 - Mock sb_api responses (MSW) for development
+- OpenAPI spec for sb_api scheduling endpoints (contract-first)
 
 #### Workstream 2: Host Dashboard Foundation
 - Dashboard shell (sidebar, top bar, responsive layout)
 - Auth-protected routes with session validation
 - Availability editor (weekly schedule UI)
 - Meeting type CRUD (create, edit, list, delete)
+- Meeting type notification settings (confirmation, reminder timing)
+- Meeting type cancellation/reschedule policy settings
 - Calendar connection flow (Google/Microsoft OAuth through sb_api)
 - Copy scheduling link to clipboard
 
@@ -583,10 +593,11 @@ Since scheduling entities don't exist in sb_api yet, development must be coordin
 - `/{user-slug}/{meeting-type-slug}` — date/time selection
 - Available slot computation in BFF
 - Booking form (name, email, submit)
-- Booking confirmation page
+- Booking confirmation page with "Add to Calendar" links (.ics download, Google Calendar, Outlook web)
 - Timezone auto-detection + manual override
 - Mobile-responsive booking experience
 - SSR for fast load + SEO
+- Progressive enhancement: date selection works via form POST fallback (no-JS)
 
 #### Workstream 4: Booking Management
 - Bookings list (upcoming, past, cancelled tabs)
@@ -611,6 +622,7 @@ Since scheduling entities don't exist in sb_api yet, development must be coordin
 - Rate limiting and abuse prevention on booking pages
 - Error handling and edge cases (expired slots, conflicts, etc.)
 - Loading states, empty states, onboarding flow
+- Accessibility audit: axe-core in CI, manual keyboard nav testing for DatePicker/TimeSlotPicker/AvailabilityEditor, screen reader testing for booking flow
 
 ### Phase 4: Team & Embed (v2)
 - Team features: round-robin, collective meeting types
