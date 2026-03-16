@@ -228,16 +228,53 @@ The following entities do NOT yet exist in sb_api and must be designed:
 
 **Component library**: shadcn/ui (Radix + Tailwind) for host dashboard. Booking pages should be lightweight — possibly Server Components with minimal client JS.
 
-## Remaining Open Questions
+## Clarifications from Human Review
 
-1. **Scheduling data model co-design**: The entities above are proposed. Does this match your vision for sb_api? Any missing concepts?
-2. **User roles**: sb_api has Users but no role field. For teams (round-robin, collective), do we need admin/member roles? Or is that v2?
-3. **Booking page URLs**: `schedulebot.app/{slug}/{meeting-type}` or custom domain support?
-4. **Video conferencing**: Auto-generate Zoom/Meet/Teams links, or just paste-in?
-5. **Notification delivery**: sb_api sends emails, or Schedule Bot handles it? (Resend, SendGrid, etc.)
-6. **Calendar sync direction**: sb_api already has calendar OAuth. Should bookings be auto-pushed to host's calendar?
-7. **i18n from day one?**
-8. **Embedding**: Priority for embed widget (inline/popup on external sites)?
+**Q: Does the proposed entity structure (Meeting Types, Availability, Bookings) match your vision?**
+A: Yes, confirmed.
+
+**Q: Team support (round-robin, collective) — need roles in sb_api now?**
+A: Pushed to v2. No role field needed in sb_api for v1.
+
+**Q: Custom domain support for booking URLs?**
+A: Pushed to v2. V1 uses default domain `/{slug}/{meeting-type}`.
+
+**Q: Video conferencing links — auto-generate or paste-in?**
+A: Auto-generate (Zoom/Meet/Teams). This will be provided by a future sb_api version. V1 of Schedule Bot should design for this but may use paste-in as interim.
+
+**Q: Notification delivery — sb_api or Schedule Bot?**
+A: sb_api sends emails. sb_api should provide template customization so tenant apps can customize email content/branding.
+
+**Q: Calendar sync — auto-push bookings to host's calendar?**
+A: Yes, auto-push. Bookings should automatically create calendar events on the host's connected calendar.
+
+**Q: i18n from day one?**
+A: Pushed to v2, unless deferring would complicate things later. (Note: recommend structuring string extraction from day one to avoid painful retrofit — use next-intl or similar with English-only initially.)
+
+**Q: Embed widget priority?**
+A: v2 or v3. Nice to have but not critical for launch.
+
+## v1 vs v2+ Scope Summary
+
+| Feature | v1 | v2+ |
+|---------|----|----|
+| One-on-one meeting types | Yes | |
+| Availability (weekly + overrides) | Yes | |
+| Public booking pages | Yes | |
+| Calendar sync (auto-push) | Yes | |
+| Booking management (view/cancel/reschedule) | Yes | |
+| Email notifications (via sb_api) | Yes | |
+| Custom intake questions | Yes | |
+| Buffer times, booking limits | Yes | |
+| Team features (round-robin, collective) | | v2 |
+| Auto-generate video links (sb_api) | | v2 |
+| Custom domains | | v2 |
+| i18n | | v2 |
+| Embed widget | | v2-v3 |
+| CRM integrations | | v2+ |
+| Payment collection | | v2+ |
+| Workflows/automations | | v2+ |
+| SMS/WhatsApp notifications | | v2+ |
 
 ## Rough Approach
 
