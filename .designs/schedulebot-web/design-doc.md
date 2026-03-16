@@ -438,7 +438,7 @@ Algorithm:
 - Rate limiting on booking creation: max 5 bookings per IP per hour (implemented in BFF middleware)
 - Rate limiting on slot queries: max 60 requests per IP per minute
 - CAPTCHA (hCaptcha or Turnstile) on booking form if abuse detected
-- Email verification: send confirmation email with a "confirm booking" link (optional, configurable per meeting type)
+- Email verification: optional "confirm booking" link (configurable per meeting type, default OFF — PRD requires frictionless booking)
 - Honeypot field in booking form for basic bot detection
 
 **4. Invitee Self-Service Tokens**
