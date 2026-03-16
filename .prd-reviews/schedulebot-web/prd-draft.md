@@ -2,18 +2,20 @@
 
 ## Problem Statement
 
-The sb_api scheduling API exists but lacks a user-facing web interface. Users currently have no visual way to interact with scheduling functionality — creating, viewing, editing, and managing schedules. Without a frontend, the API's value is limited to developers who can integrate directly.
+sb_api provides a Calendly-style appointment scheduling backend, but lacks a user-facing web interface. Schedule Bot is the primary frontend tenant — a booking and availability management tool where hosts set their availability, create meeting types, and share scheduling links so invitees can self-book appointments.
 
-**Who:** End-users who need to manage schedules (employees, managers, administrators). The app will serve as one tenant of the sb_api system, with other apps also acting as tenants.
+**Who:** Professionals and teams who need to let others book time with them — consultants, sales teams, recruiters, support teams, freelancers, and anyone who currently plays email tag to schedule meetings.
 
-**Why now:** A clean, modern web frontend establishes the primary user experience for Schedule Bot and serves as the reference tenant implementation for sb_api.
+**Why now:** The sb_api infrastructure (tenants, users, OAuth calendar integration) is in place. Schedule Bot establishes the primary user experience and serves as the reference tenant implementation.
 
 ## Goals
 
-- Deliver a production-ready web frontend for sb_api scheduling operations
-- Provide an intuitive, modern UX for schedule creation, viewing, editing, and management
-- Establish Schedule Bot brand identity with a modern green-based color palette
-- Build a reference single-tenant implementation that demonstrates sb_api integration patterns
+- Deliver a production-ready Calendly-style scheduling frontend for sb_api
+- Provide intuitive booking pages where invitees can self-schedule appointments
+- Enable hosts to manage availability, meeting types, and booking settings
+- Integrate with Google and Microsoft calendars (via sb_api's existing OAuth)
+- Establish Schedule Bot brand identity with a modern green palette
+- Build a reference single-tenant implementation demonstrating sb_api patterns
 - Achieve fast page loads and responsive design across desktop and mobile
 - Follow accessibility best practices (WCAG 2.1 AA minimum)
 
@@ -21,34 +23,125 @@ The sb_api scheduling API exists but lacks a user-facing web interface. Users cu
 
 - Multi-tenant architecture within this app (each tenant is a separate app)
 - Native mobile apps (responsive web is sufficient for v1)
-- Admin/super-admin panel for managing multiple tenants
-- Real-time collaboration features (e.g., live co-editing of schedules)
+- Building a custom auth system (sb_api provides API key auth + OAuth2 for Google/Microsoft)
+- Payment collection for paid meetings (defer to v2)
+- CRM integrations (Salesforce, HubSpot — defer to v2)
+- SMS/WhatsApp notifications (defer to v2)
 - Offline support / PWA capabilities (defer to v2)
-- Payment/billing integration
-- Building a custom auth system (sb_api provides API key auth + OAuth2 flows for Google/Microsoft; Schedule Bot integrates these via BFF pattern)
+- Video conferencing hosting (integrate with Zoom/Meet/Teams links, don't build one)
+
+## Domain Model
+
+### Core Concepts (Calendly-aligned)
+
+**Meeting Types** (Calendly calls these "Event Types")
+The templates that define what can be booked:
+- Name, description, slug (for booking URL)
+- Duration (15m, 30m, 45m, 60m, custom)
+- Location type: in-person, phone, video (Zoom/Meet/Teams link), custom
+- Booking window: how far in advance can someone book? (e.g., 1-60 days out)
+- Minimum scheduling notice: how soon before a slot can someone book? (e.g., 4 hours)
+- Buffer time: padding before/after meetings (e.g., 15m between back-to-back)
+- Max bookings per day (optional cap)
+- Custom intake questions (text, dropdown, checkbox — collected from invitee at booking)
+- Confirmation/reminder settings
+- Active/inactive toggle
+- Color coding for calendar display
+
+**Meeting Type Variants:**
+- **One-on-One**: Single host, single invitee (default)
+- **Group**: One host, multiple invitees book the same slot (e.g., webinar, class)
+- **Round-Robin**: Multiple hosts, system assigns based on availability/fairness
+- **Collective**: Multiple hosts must ALL be available (team interview, panel meeting)
+
+**Availability**
+When a host can accept bookings:
+- Weekly recurring schedule (e.g., Mon-Fri 9am-5pm)
+- Multiple schedule profiles (e.g., "Weekday hours", "Weekend office hours")
+- Date-specific overrides (e.g., "Dec 25 — unavailable", "March 10 — 10am-2pm only")
+- Calendar conflict checking: automatically block times with existing calendar events
+- Timezone-aware: host sets their timezone, invitee sees slots in their own timezone
+
+**Bookings** (Calendly calls these "Events")
+Actual scheduled appointments:
+- Meeting type reference
+- Host(s) and invitee(s)
+- Start time, end time, timezone
+- Location details (video link, address, phone number)
+- Status: confirmed, cancelled, rescheduled
+- Invitee responses to custom intake questions
+- Calendar event IDs (synced to host's connected calendar)
+- Cancellation/reschedule policy and reason
+
+**Scheduling Pages**
+Public-facing booking interfaces:
+- Personal scheduling page: `schedulebot.app/{user-slug}` — lists all active meeting types
+- Direct meeting type link: `schedulebot.app/{user-slug}/{meeting-type-slug}` — jumps to time selection
+- Embeddable widget (inline, popup, or popup text)
+
+**Workflows** (v2 — but design for extensibility)
+Automated actions triggered by booking events:
+- Confirmation email to invitee
+- Reminder email/notification before meeting
+- Follow-up email after meeting
+- Custom webhook triggers
+
+### Data Model Relationship
+
+```
+Tenant (sb_api)
+└── User (host)
+    ├── Availability Schedules
+    │   ├── Weekly Rules (recurring)
+    │   └── Date Overrides (specific dates)
+    ├── Meeting Types
+    │   ├── Custom Questions
+    │   └── Settings (buffer, notice, window, max/day)
+    ├── Bookings
+    │   ├── Invitee(s)
+    │   ├── Answers to custom questions
+    │   └── Calendar sync status
+    └── Calendar Connections (sb_api — already exists)
+        ├── Google Calendar
+        └── Microsoft Calendar
+```
 
 ## User Stories / Scenarios
 
 ### Actors
-- **Employee**: Views their schedule, requests changes, marks availability
-- **Manager**: Creates/edits schedules, assigns shifts, approves requests
-- **Administrator**: Configures scheduling rules, manages teams/departments
+- **Host**: Sets availability, creates meeting types, manages bookings
+- **Invitee**: Books time with a host via a public scheduling page (no account required)
+- **Team Admin**: Manages team members, round-robin pools, collective meeting types
 
-### Core Stories
+### Core Stories — Host
 
-1. **As a manager**, I want to create a weekly schedule for my team so that everyone knows their shifts
-2. **As an employee**, I want to view my upcoming schedule so I know when I'm working
-3. **As an employee**, I want to request time off or shift swaps so I can manage my availability
-4. **As a manager**, I want to see an overview of all team schedules so I can identify coverage gaps
-5. **As an administrator**, I want to configure scheduling rules (max hours, required coverage) so schedules are compliant
-6. **As a manager**, I want to receive notifications about schedule conflicts or requests so I can respond promptly
-7. **As an employee**, I want to set my recurring availability preferences so managers can plan around them
+1. **As a host**, I want to connect my Google/Microsoft calendar so Schedule Bot knows when I'm busy
+2. **As a host**, I want to set my weekly availability hours so invitees can only book during those times
+3. **As a host**, I want to create meeting types (e.g., "30 min intro call", "60 min consultation") so invitees can pick the right meeting
+4. **As a host**, I want to share my scheduling link so people can book time without email back-and-forth
+5. **As a host**, I want to see all my upcoming bookings in one place so I can prepare
+6. **As a host**, I want to cancel or reschedule a booking and have the invitee notified automatically
+7. **As a host**, I want to add buffer time between meetings so I'm not booked back-to-back
+8. **As a host**, I want to set date-specific overrides (holidays, special hours) on my availability
+9. **As a host**, I want to add custom intake questions to a meeting type so I get context before the meeting
+
+### Core Stories — Invitee
+
+10. **As an invitee**, I want to see available time slots in my own timezone so I don't have to convert times
+11. **As an invitee**, I want to book a meeting in a few clicks without creating an account
+12. **As an invitee**, I want to receive a confirmation with calendar invite and video link
+13. **As an invitee**, I want to cancel or reschedule my booking via a link in the confirmation email
+
+### Core Stories — Team
+
+14. **As a team admin**, I want to set up round-robin meeting types so leads are distributed fairly across my team
+15. **As a team admin**, I want to create collective meeting types so all required people must be available
 
 ### Key Scenarios
 
-- **Schedule creation flow**: Manager selects date range → views team roster → drag-drops shifts onto a calendar grid → publishes schedule → team gets notified
-- **Availability management**: Employee opens availability page → marks available/unavailable time blocks → submits → manager sees updated availability when creating schedules
-- **Conflict resolution**: System detects double-booking or overtime → highlights conflicts → manager adjusts or overrides with reason
+- **Booking flow**: Invitee clicks scheduling link → selects meeting type → sees available time slots (filtered by host availability + calendar conflicts) → picks a slot → fills in name, email, custom questions → confirms → both parties get calendar invite
+- **Availability management**: Host opens settings → sets Mon-Fri 9-5 as base hours → adds override for Dec 25 (unavailable) → connects Google Calendar → busy times automatically blocked
+- **Reschedule flow**: Invitee clicks reschedule link → sees new available slots → picks new time → old booking cancelled, new one created → both parties notified
 
 ## Constraints
 
@@ -59,14 +152,39 @@ The sb_api scheduling API exists but lacks a user-facing web interface. Users cu
 - **Deployment**: Should support Vercel, Docker, or similar modern hosting
 - **Browser support**: Last 2 versions of Chrome, Firefox, Safari, Edge
 - **Performance**: LCP < 2.5s, FID < 100ms, CLS < 0.1 (Core Web Vitals)
+- **Booking pages must be fast**: These are public-facing — invitees judge the product by booking page speed
 
 ### Business
-- Single-tenant: this app is Schedule Bot only; other tenants are separate apps
+- Single-tenant: Schedule Bot is one tenant of sb_api
 - Brand identity must feel professional yet approachable
-- Must work for teams of 5–500 people
+- Booking pages must work without JavaScript for basic functionality (progressive enhancement)
+- Invitees must NOT need an account to book
 
 ### Timeline
 - Not specified — quality over speed
+
+## sb_api Integration (from codebase analysis)
+
+### Existing Infrastructure
+- **REST API** at `/api/v1/`, Go stdlib `net/http`
+- **Multi-tenant** via API keys (`Authorization: Bearer sk_live_...`)
+- **Users**: UUID, tenant_id, email, name, timezone, slug
+- **Calendar OAuth**: Google and Microsoft, encrypted token storage, sync status tracking
+- **Pagination**: offset-based, default 20, max 100
+
+### Needs to be Built in sb_api (co-development)
+The following entities do NOT yet exist in sb_api and must be designed:
+- Availability schedules (weekly rules + date overrides)
+- Meeting types (with settings, custom questions)
+- Bookings (with invitee info, status, calendar sync)
+- Team/round-robin/collective configurations (v2)
+- Notification/workflow triggers (v2)
+
+### Auth Model for Frontend
+1. Schedule Bot backend (BFF) holds the sb_api API key (server-side only)
+2. Hosts authenticate via OAuth (Google/Microsoft) through sb_api's OAuth endpoints
+3. User identity passed via `X-User-ID`/`X-User-Slug` headers from BFF to sb_api
+4. Invitees do NOT authenticate — booking pages are public
 
 ## Brand & Design Direction
 
@@ -78,92 +196,48 @@ The sb_api scheduling API exists but lacks a user-facing web interface. Users cu
 | Primary Dark | Deep Emerald | `#059669` | Hover states, emphasis |
 | Primary Light | Mint | `#D1FAE5` | Backgrounds, highlights, success states |
 | Secondary | Slate | `#475569` | Text, secondary UI elements |
-| Accent | Teal | `#14B8A6` | Links, secondary actions, data viz |
+| Accent | Teal | `#14B8A6` | Links, secondary actions, time slot highlights |
 | Background | Off-White | `#F8FAFC` | Page background |
 | Surface | White | `#FFFFFF` | Cards, modals, elevated surfaces |
-| Error | Rose | `#F43F5E` | Errors, destructive actions |
-| Warning | Amber | `#F59E0B` | Warnings, conflicts |
+| Error | Rose | `#F43F5E` | Errors, destructive actions, cancelled bookings |
+| Warning | Amber | `#F59E0B` | Warnings, scheduling conflicts |
 
 ### Design Principles
-1. **Calendar-first**: The schedule view is the hero — prioritize calendar/grid UX
-2. **Scannable**: Dense information presented clearly — color coding, visual hierarchy
-3. **Responsive**: Mobile-first but optimized for desktop manager workflows
-4. **Minimal chrome**: Let content breathe, reduce visual noise
+1. **Booking-first**: The invitee booking experience is the hero — it must be frictionless
+2. **Clean and trustworthy**: Invitees are landing on a stranger's scheduling page — it must feel safe and professional
+3. **Scannable time slots**: Available times presented clearly with timezone context
+4. **Responsive**: Booking pages must be excellent on mobile (many invitees book from phones)
 5. **Accessible**: High contrast ratios, keyboard navigation, screen reader support
 
 ### Design Suggestions
 
-**Layout approach**: Sidebar navigation (collapsible on mobile) + main content area. Top bar for user context, notifications, and quick actions.
+**Two distinct UX surfaces:**
 
-**Calendar views**:
-- Day / Week / Month toggle (like Google Calendar but purpose-built for shifts)
-- Drag-and-drop shift assignment on the calendar grid
-- Color-coded by role, department, or shift type
+1. **Host Dashboard** (authenticated, complex):
+   - Sidebar navigation: Bookings, Meeting Types, Availability, Integrations, Settings
+   - Calendar view of upcoming bookings
+   - Quick-copy scheduling links
+   - Meeting type management cards
 
-**Alternative consideration — Dashboard-first vs Calendar-first**:
-A dashboard landing page with KPIs (coverage %, upcoming conflicts, pending requests) might serve managers better than jumping straight to the calendar. Recommend: dashboard as default for managers, calendar/schedule view as default for employees. Role-based default views.
+2. **Booking Pages** (public, simple):
+   - Minimal, focused UI — meeting type info + time slot picker
+   - Two-step: select time → enter details → confirm
+   - Host's photo/name/branding for trust
+   - Timezone auto-detection with manual override
+   - Mobile-optimized time slot grid
 
-**Component library approach**:
-- Use Radix UI primitives (headless, accessible) + Tailwind for styling
-- Alternatively: shadcn/ui (built on Radix + Tailwind) — provides pre-built, customizable components that match our stack perfectly
-- Recommendation: **shadcn/ui** — fastest path to polished UI while maintaining full customization control
-
-## sb_api Integration (from codebase analysis)
-
-### Confirmed API Shape
-- **REST API** (Go stdlib `net/http`, no GraphQL) at `/api/v1/`
-- **Auth**: API key via `Authorization: Bearer sk_live_...` or `X-API-Key` header
-- **User context**: `X-User-ID` (UUID) or `X-User-Slug` headers on user-scoped endpoints
-- **Pagination**: offset-based, default 20, max 100
-
-### Existing Endpoints
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/api/v1/tenants` | None | Create tenant (returns API key) |
-| GET | `/api/v1/tenant` | API key | Get current tenant |
-| GET | `/api/v1/users` | API key | List users (paginated) |
-| POST | `/api/v1/users` | API key | Create user |
-| GET | `/api/v1/users/{id\|slug}` | API key | Get user by UUID or slug |
-| PUT | `/api/v1/users/{id}` | API key | Update user |
-| POST | `/api/v1/oauth/{google\|microsoft}` | API key + user | Start OAuth flow |
-| GET | `/api/v1/oauth/{google\|microsoft}` | API key + user | OAuth callback |
-| GET | `/health` | None | Health check |
-
-### Existing Data Model
-- **Tenants**: UUID, name, slug (unique), created_at
-- **Users**: UUID, tenant_id, email, name, timezone (default UTC), slug, created_at
-- **API Keys**: key_hash (SHA256), key_prefix, per-tenant
-- **Calendar Connections**: user_id, provider (google/microsoft), encrypted tokens, read/write calendar IDs, sync status
-- **OAuth Apps**: user_id, provider, encrypted client credentials
-
-### Critical Finding: No Scheduling Entities Yet
-**sb_api has no shift, schedule, team, department, or availability entities.** The API provides tenant/user/auth infrastructure and calendar OAuth, but the scheduling domain model must be designed and built alongside the frontend. This is a co-development effort, not just a frontend for an existing API.
-
-### Tenant Model (Confirmed)
-Schedule Bot is one tenant of a shared sb_api instance. Each tenant gets an isolated API key. All data is scoped by `tenant_id`. No cross-tenant data leakage — all queries enforce tenant isolation.
-
-### Auth Model for Frontend
-The BFF pattern works well here:
-1. Schedule Bot backend holds the sb_api API key (server-side only)
-2. Frontend authenticates users via OAuth (Google/Microsoft) through sb_api's OAuth endpoints
-3. User identity passed via `X-User-ID`/`X-User-Slug` headers from BFF to sb_api
-4. User roles/permissions need to be designed (not yet in sb_api)
-
-### Timezone
-Users have a `timezone` field (default UTC). Display in user-local timezone, store in UTC.
+**Component library**: shadcn/ui (Radix + Tailwind) for host dashboard. Booking pages should be lightweight — possibly Server Components with minimal client JS.
 
 ## Remaining Open Questions
 
-1. **Scheduling data model**: What entities should sb_api add? (shifts, schedules, teams, departments, availability, rules?) This is a co-design effort.
-2. **User roles/permissions**: sb_api has Users but no role field. Who defines Employee vs Manager vs Admin? sb_api or Schedule Bot?
-3. **Real-time needs**: WebSocket/SSE for live schedule updates, or polling sufficient?
-4. **Notification system**: In-app only, or also email/push? Where does notification delivery live?
-5. **Conflict detection rules**: Overtime thresholds, double-booking, minimum rest periods — defined in sb_api or frontend?
-6. **Calendar sync direction**: sb_api has calendar OAuth. Does it push shifts TO calendars, or is that Schedule Bot's job?
-7. **Industry target**: Healthcare, retail, office, or general-purpose? Affects data model design.
-8. **MVP team size**: Recommend 5-50 for v1. Confirm?
-9. **i18n**: Needed from day one?
-10. **Schedule lifecycle**: Draft → published → archived? Editable after publish?
+1. **Scheduling data model co-design**: The entities above are proposed. Does this match your vision for sb_api? Any missing concepts?
+2. **User roles**: sb_api has Users but no role field. For teams (round-robin, collective), do we need admin/member roles? Or is that v2?
+3. **Booking page URLs**: `schedulebot.app/{slug}/{meeting-type}` or custom domain support?
+4. **Video conferencing**: Auto-generate Zoom/Meet/Teams links, or just paste-in?
+5. **Notification delivery**: sb_api sends emails, or Schedule Bot handles it? (Resend, SendGrid, etc.)
+6. **Calendar sync direction**: sb_api already has calendar OAuth. Should bookings be auto-pushed to host's calendar?
+7. **i18n from day one?**
+8. **Embedding**: Priority for embed widget (inline/popup on external sites)?
 
 ## Rough Approach
 
@@ -171,35 +245,42 @@ Users have a `timezone` field (default UTC). Display in user-local timezone, sto
 ```
 Next.js App Router
 ├── app/
-│   ├── (auth)/          # Login/auth pages
-│   ├── (dashboard)/     # Manager dashboard
-│   ├── schedule/        # Calendar/schedule views
-│   ├── availability/    # Employee availability management
-│   ├── team/            # Team/roster management
-│   ├── settings/        # App settings, rules config
-│   └── api/             # API routes (BFF pattern for sb_api)
+│   ├── (auth)/              # Host login via OAuth
+│   ├── (dashboard)/         # Host management UI
+│   │   ├── bookings/        # Booking list + calendar view
+│   │   ├── meeting-types/   # Create/edit meeting types
+│   │   ├── availability/    # Set weekly hours + overrides
+│   │   ├── integrations/    # Calendar connections
+│   │   └── settings/        # Profile, branding, preferences
+│   ├── [user-slug]/         # Public scheduling pages
+│   │   ├── page.tsx         # List of meeting types
+│   │   └── [meeting-type]/  # Time slot picker + booking form
+│   └── api/                 # BFF routes proxying to sb_api
 ├── components/
-│   ├── ui/              # shadcn/ui base components
-│   ├── schedule/        # Schedule-specific components
-│   └── layout/          # Shell, sidebar, navigation
+│   ├── ui/                  # shadcn/ui base components
+│   ├── booking/             # Booking page components (lightweight)
+│   ├── dashboard/           # Host dashboard components
+│   └── layout/              # Shell, sidebar, navigation
 ├── lib/
-│   ├── api/             # sb_api client SDK/hooks
-│   ├── auth/            # Auth utilities
-│   └── utils/           # Shared utilities
+│   ├── api/                 # sb_api client SDK/hooks
+│   ├── auth/                # OAuth utilities
+│   ├── availability/        # Availability calculation logic
+│   └── timezone/            # Timezone utilities
 └── styles/
-    └── globals.css      # Tailwind config, custom properties
+    └── globals.css          # Tailwind config, custom properties
 ```
 
 ### Key Technical Decisions
-1. **Next.js App Router** with Server Components for data fetching, Client Components for interactivity
-2. **shadcn/ui** for component primitives — accessible, customizable, Tailwind-native
-3. **React Query (TanStack Query)** for server state management and caching
-4. **Zustand** for minimal client state (UI state, user preferences)
-5. **BFF pattern**: Next.js API routes proxy to sb_api — keeps API keys server-side, enables response transformation
-6. **date-fns** or **Temporal API** for date/time handling (scheduling is date-heavy)
+1. **Next.js App Router** with Server Components for booking pages (fast, SEO-friendly), Client Components for dashboard interactivity
+2. **shadcn/ui** for host dashboard components
+3. **Booking pages as Server Components**: Minimal JS for fastest possible load. Time slot selection can hydrate on interaction.
+4. **TanStack Query** for server state management in dashboard
+5. **BFF pattern**: Next.js API routes proxy to sb_api — keeps API key server-side
+6. **date-fns-tz** for timezone-aware date handling (critical for scheduling across timezones)
+7. **Timezone auto-detection** via `Intl.DateTimeFormat().resolvedOptions().timeZone`
 
-### Phasing (suggested)
-- **Phase 1**: Auth + Schedule viewing (read-only calendar, employee view)
-- **Phase 2**: Schedule creation + editing (manager workflow, drag-drop)
-- **Phase 3**: Availability management + conflict detection
-- **Phase 4**: Dashboard, notifications, rules configuration
+### Phasing (revised)
+- **Phase 1**: Host onboarding + availability + basic one-on-one meeting types + public booking pages
+- **Phase 2**: Booking management (view, cancel, reschedule) + calendar sync + notifications
+- **Phase 3**: Custom intake questions, buffer times, booking limits, date overrides
+- **Phase 4**: Team features (round-robin, collective), embed widget, workflows
