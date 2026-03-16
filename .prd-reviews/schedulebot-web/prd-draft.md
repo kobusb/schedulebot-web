@@ -25,7 +25,7 @@ The sb_api scheduling API exists but lacks a user-facing web interface. Users cu
 - Real-time collaboration features (e.g., live co-editing of schedules)
 - Offline support / PWA capabilities (defer to v2)
 - Payment/billing integration
-- User authentication system design (assumed provided by sb_api or an auth layer)
+- Building a custom auth system (sb_api provides API key auth + OAuth2 flows for Google/Microsoft; Schedule Bot integrates these via BFF pattern)
 
 ## User Stories / Scenarios
 
@@ -55,7 +55,7 @@ The sb_api scheduling API exists but lacks a user-facing web interface. Users cu
 ### Technical
 - **Framework**: Next.js (App Router) with React 19+
 - **Styling**: Tailwind CSS v4
-- **API integration**: Must consume sb_api REST/GraphQL endpoints as a tenant
+- **API integration**: Must consume sb_api REST endpoints as a tenant (Go stdlib HTTP, JSON, `/api/v1/` prefix)
 - **Deployment**: Should support Vercel, Docker, or similar modern hosting
 - **Browser support**: Last 2 versions of Chrome, Firefox, Safari, Edge
 - **Performance**: LCP < 2.5s, FID < 100ms, CLS < 0.1 (Core Web Vitals)
@@ -108,18 +108,62 @@ A dashboard landing page with KPIs (coverage %, upcoming conflicts, pending requ
 - Alternatively: shadcn/ui (built on Radix + Tailwind) — provides pre-built, customizable components that match our stack perfectly
 - Recommendation: **shadcn/ui** — fastest path to polished UI while maintaining full customization control
 
-## Open Questions
+## sb_api Integration (from codebase analysis)
 
-1. **API shape**: What does the sb_api scheduling API look like? REST or GraphQL? What endpoints exist? Need API docs or schema.
-2. **Authentication**: How is auth handled? OAuth2? API keys? Does sb_api provide auth or do we need our own?
-3. **Tenant identification**: How does sb_api identify this app as a tenant? API key? Subdomain? Header?
-4. **Real-time needs**: Do we need WebSocket/SSE for live schedule updates, or is polling sufficient?
-5. **Notification system**: In-app only, or also email/SMS? Does sb_api handle notification delivery?
-6. **Data model**: What entities does sb_api expose? (shifts, employees, teams, departments, rules?)
-7. **Permissions model**: How granular are role permissions? Is RBAC handled by sb_api or the frontend?
-8. **Existing design system**: Is there a shared design system or component library across tenants?
-9. **Internationalization**: Does Schedule Bot need i18n support from day one?
-10. **Calendar integrations**: Should shifts sync to Google Calendar / Outlook? Is that an sb_api feature or frontend concern?
+### Confirmed API Shape
+- **REST API** (Go stdlib `net/http`, no GraphQL) at `/api/v1/`
+- **Auth**: API key via `Authorization: Bearer sk_live_...` or `X-API-Key` header
+- **User context**: `X-User-ID` (UUID) or `X-User-Slug` headers on user-scoped endpoints
+- **Pagination**: offset-based, default 20, max 100
+
+### Existing Endpoints
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/v1/tenants` | None | Create tenant (returns API key) |
+| GET | `/api/v1/tenant` | API key | Get current tenant |
+| GET | `/api/v1/users` | API key | List users (paginated) |
+| POST | `/api/v1/users` | API key | Create user |
+| GET | `/api/v1/users/{id\|slug}` | API key | Get user by UUID or slug |
+| PUT | `/api/v1/users/{id}` | API key | Update user |
+| POST | `/api/v1/oauth/{google\|microsoft}` | API key + user | Start OAuth flow |
+| GET | `/api/v1/oauth/{google\|microsoft}` | API key + user | OAuth callback |
+| GET | `/health` | None | Health check |
+
+### Existing Data Model
+- **Tenants**: UUID, name, slug (unique), created_at
+- **Users**: UUID, tenant_id, email, name, timezone (default UTC), slug, created_at
+- **API Keys**: key_hash (SHA256), key_prefix, per-tenant
+- **Calendar Connections**: user_id, provider (google/microsoft), encrypted tokens, read/write calendar IDs, sync status
+- **OAuth Apps**: user_id, provider, encrypted client credentials
+
+### Critical Finding: No Scheduling Entities Yet
+**sb_api has no shift, schedule, team, department, or availability entities.** The API provides tenant/user/auth infrastructure and calendar OAuth, but the scheduling domain model must be designed and built alongside the frontend. This is a co-development effort, not just a frontend for an existing API.
+
+### Tenant Model (Confirmed)
+Schedule Bot is one tenant of a shared sb_api instance. Each tenant gets an isolated API key. All data is scoped by `tenant_id`. No cross-tenant data leakage — all queries enforce tenant isolation.
+
+### Auth Model for Frontend
+The BFF pattern works well here:
+1. Schedule Bot backend holds the sb_api API key (server-side only)
+2. Frontend authenticates users via OAuth (Google/Microsoft) through sb_api's OAuth endpoints
+3. User identity passed via `X-User-ID`/`X-User-Slug` headers from BFF to sb_api
+4. User roles/permissions need to be designed (not yet in sb_api)
+
+### Timezone
+Users have a `timezone` field (default UTC). Display in user-local timezone, store in UTC.
+
+## Remaining Open Questions
+
+1. **Scheduling data model**: What entities should sb_api add? (shifts, schedules, teams, departments, availability, rules?) This is a co-design effort.
+2. **User roles/permissions**: sb_api has Users but no role field. Who defines Employee vs Manager vs Admin? sb_api or Schedule Bot?
+3. **Real-time needs**: WebSocket/SSE for live schedule updates, or polling sufficient?
+4. **Notification system**: In-app only, or also email/push? Where does notification delivery live?
+5. **Conflict detection rules**: Overtime thresholds, double-booking, minimum rest periods — defined in sb_api or frontend?
+6. **Calendar sync direction**: sb_api has calendar OAuth. Does it push shifts TO calendars, or is that Schedule Bot's job?
+7. **Industry target**: Healthcare, retail, office, or general-purpose? Affects data model design.
+8. **MVP team size**: Recommend 5-50 for v1. Confirm?
+9. **i18n**: Needed from day one?
+10. **Schedule lifecycle**: Draft → published → archived? Editable after publish?
 
 ## Rough Approach
 
