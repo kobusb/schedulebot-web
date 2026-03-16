@@ -578,16 +578,21 @@ Since scheduling entities don't exist in sb_api yet, development must be coordin
 - Mock sb_api responses (MSW) for development
 - OpenAPI spec for sb_api scheduling endpoints (contract-first)
 - i18n-ready: use string constants for all user-facing text (enables future extraction without refactoring)
+- Environment variables: SB_API_KEY, SB_API_URL, NEXT_PUBLIC_APP_URL, SESSION_SECRET
+- Session storage: encrypted httpOnly cookies via iron-session (stateless, no external store)
+- Deployment: Dockerfile + Vercel config
+- README with project setup instructions
 
 #### Workstream 2: Host Dashboard Foundation
 - Dashboard shell (sidebar, top bar, responsive layout)
 - Auth-protected routes with session validation
 - Availability editor (weekly schedule UI)
-- Meeting type CRUD (create, edit, list, delete)
+- Meeting type CRUD (create, edit, list, delete) — includes buffer times, booking window, max/day settings
 - Meeting type notification settings (confirmation, reminder timing)
 - Meeting type cancellation/reschedule policy settings
 - Calendar connection flow (Google/Microsoft OAuth through sb_api)
-- Copy scheduling link to clipboard
+- Calendar reconnect flow (handle revoked/expired tokens)
+- Copy scheduling link to clipboard (prominent on dashboard home + meeting type cards)
 
 #### Workstream 3: Public Booking Pages
 - `/{user-slug}` — host profile with meeting type list
@@ -599,6 +604,9 @@ Since scheduling entities don't exist in sb_api yet, development must be coordin
 - Mobile-responsive booking experience
 - SSR for fast load + SEO
 - Progressive enhancement: date selection works via form POST fallback (no-JS)
+- Error boundary: "temporarily unavailable" with retry if sb_api is down
+- E2E test: complete booking flow (Playwright)
+- Unit tests: slot computation algorithm (Vitest)
 
 #### Workstream 4: Booking Management
 - Bookings list (upcoming, past, cancelled tabs)
@@ -607,14 +615,12 @@ Since scheduling entities don't exist in sb_api yet, development must be coordin
 - Host-initiated reschedule: host picks new time from availability → invitee notified
 - Cancel/reschedule via invitee self-service tokens in email links
 - Calendar auto-push (booking creates calendar event via sb_api)
+- E2E test: cancel/reschedule flow (Playwright)
 
 ### Phase 2: Polish & Advanced Settings
 - Custom intake questions on meeting types
-- Buffer times (before/after meetings)
-- Booking limits (max per day)
-- Date-specific availability overrides
-- Booking window configuration
-- Minimum scheduling notice
+- Date-specific availability overrides (OverrideCalendar UI)
+- Minimum scheduling notice configuration
 - Meeting type colors for calendar display
 
 ### Phase 3: Notifications & Experience
@@ -624,6 +630,7 @@ Since scheduling entities don't exist in sb_api yet, development must be coordin
 - Rate limiting and abuse prevention on booking pages
 - Error handling and edge cases (expired slots, conflicts, etc.)
 - Loading states, empty states, onboarding flow
+- Error monitoring setup (Sentry or similar)
 - Accessibility audit: axe-core in CI, manual keyboard nav testing for DatePicker/TimeSlotPicker/AvailabilityEditor, screen reader testing for booking flow
 
 ### Phase 4: Team & Embed (v2)
