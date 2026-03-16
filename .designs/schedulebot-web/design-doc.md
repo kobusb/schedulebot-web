@@ -431,7 +431,7 @@ Algorithm:
 **2. Session Security**
 - httpOnly, Secure, SameSite=Lax cookies for session tokens
 - Session tokens are opaque (random), not JWTs (no client-side decoding needed)
-- Session expiry: 7 days with sliding window
+- Session expiry: fixed 7 days
 - CSRF protection via SameSite cookie + Origin header validation
 
 **3. Booking Page Abuse Prevention**
@@ -578,7 +578,8 @@ Since scheduling entities don't exist in sb_api yet, development must be coordin
 - Mock sb_api responses (MSW) for development
 - OpenAPI spec for sb_api scheduling endpoints (contract-first)
 - i18n-ready: use string constants for all user-facing text (enables future extraction without refactoring)
-- Environment variables: SB_API_KEY, SB_API_URL, NEXT_PUBLIC_APP_URL, SESSION_SECRET
+- Environment variables: SB_API_KEY, SB_API_URL, NEXT_PUBLIC_APP_URL, SESSION_SECRET, ENABLE_PUBLIC_BOOKING
+- Spike: slot computation algorithm with timezone edge case tests (DST, boundaries, multi-tz)
 - Session storage: encrypted httpOnly cookies via iron-session (stateless, no external store)
 - Deployment: Dockerfile + Vercel config
 - README with project setup instructions
@@ -617,9 +618,14 @@ Since scheduling entities don't exist in sb_api yet, development must be coordin
 - Calendar auto-push (booking creates calendar event via sb_api)
 - E2E test: cancel/reschedule flow (Playwright)
 
+#### Workstream 5: sb_api Integration
+- Replace MSW mocks with real sb_api calls (when endpoints are ready)
+- Integration testing against real sb_api
+
 ### Phase 2: Polish & Advanced Settings
 - Custom intake questions on meeting types
 - Date-specific availability overrides (OverrideCalendar UI)
+- Multiple availability schedule profiles (power-user feature)
 - Minimum scheduling notice configuration
 - Meeting type colors for calendar display
 
