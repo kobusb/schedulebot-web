@@ -603,7 +603,7 @@ Since scheduling entities don't exist in sb_api yet, development must be coordin
 - Booking confirmation page with "Add to Calendar" links (.ics download, Google Calendar, Outlook web)
 - Timezone auto-detection + manual override
 - Mobile-responsive booking experience
-- SSR for fast load + SEO
+- SSR for fast load + SEO (dynamic title, meta description, OG tags per meeting type)
 - Progressive enhancement: date selection works via form POST fallback (no-JS)
 - Error boundary: "temporarily unavailable" with retry if sb_api is down
 - E2E test: complete booking flow (Playwright)
