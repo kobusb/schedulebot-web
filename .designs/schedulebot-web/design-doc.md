@@ -537,7 +537,7 @@ Algorithm:
 
 All email is sent by sb_api (confirmed by human review):
 
-1. Booking created → sb_api sends confirmation to invitee + notification to host
+1. Booking created → sb_api sends confirmation to invitee (with .ics calendar invite attachment) + notification to host
 2. Booking cancelled → sb_api sends cancellation notice to both parties
 3. Booking rescheduled → sb_api sends reschedule notice to both parties
 4. Reminder (configurable) → sb_api sends reminder N hours before meeting
@@ -577,6 +577,7 @@ Since scheduling entities don't exist in sb_api yet, development must be coordin
 - CI/CD pipeline (lint, typecheck, test, deploy)
 - Mock sb_api responses (MSW) for development
 - OpenAPI spec for sb_api scheduling endpoints (contract-first)
+- i18n-ready: use string constants for all user-facing text (enables future extraction without refactoring)
 
 #### Workstream 2: Host Dashboard Foundation
 - Dashboard shell (sidebar, top bar, responsive layout)
@@ -603,6 +604,7 @@ Since scheduling entities don't exist in sb_api yet, development must be coordin
 - Bookings list (upcoming, past, cancelled tabs)
 - Booking detail view
 - Cancel booking (host-initiated, with email notification)
+- Host-initiated reschedule: host picks new time from availability → invitee notified
 - Cancel/reschedule via invitee self-service tokens in email links
 - Calendar auto-push (booking creates calendar event via sb_api)
 
